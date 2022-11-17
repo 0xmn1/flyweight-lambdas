@@ -1,0 +1,19 @@
+{
+  "name": "trade-triggers",
+  "version": "1.0.0",
+  "description": "",
+  "main": "x.js",
+  "scripts": {
+    "encrypt-secrets:flyweight-oracle-node": "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/flyweight-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/flyweight-oracle-node/env-secrets-encrypted.json",
+    "build:coin-market-cap-proxy": "rm ./build/coin-market-cap-proxy/build.zip && zip -j ./build/coin-market-cap-proxy/build.zip ./src/coin-market-cap-proxy/index.js",
+    "build:flyweight-oracle-node": "rm ./build/flyweight-oracle-node/build.zip && zip -j ./build/flyweight-oracle-node/build.zip ./src/flyweight-oracle-node/index.js ./src/flyweight-oracle-node/oracle-smart-contract-abi.json ./src/flyweight-oracle-node/env-secrets-encrypted.json"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.1.3",
+    "dotenv": "^16.0.3",
+    "ethers": "^5.7.2",
+    "web3": "^1.8.0"
+  }
+}
