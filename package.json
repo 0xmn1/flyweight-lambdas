@@ -4,9 +4,11 @@
   "description": "",
   "main": "x.js",
   "scripts": {
-    "encrypt-secrets:flyweight-oracle-node": "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/flyweight-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/flyweight-oracle-node/env-secrets-encrypted.json",
-    "build:coin-market-cap-proxy": "rm ./build/coin-market-cap-proxy/build.zip && zip -j ./build/coin-market-cap-proxy/build.zip ./src/coin-market-cap-proxy/index.js",
-    "build:flyweight-oracle-node": "rm ./build/flyweight-oracle-node/build.zip && zip -j ./build/flyweight-oracle-node/build.zip ./src/flyweight-oracle-node/index.js ./src/flyweight-oracle-node/oracle-smart-contract-abi.json ./src/flyweight-oracle-node/env-secrets-encrypted.json"
+    "encrypt-secrets:triggers-oracle-node": "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/triggers-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/triggers-oracle-node/env-secrets-encrypted.json",
+    "encrypt-secrets:deposit-oracle-node": "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/deposit-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/deposit-oracle-node/env-secrets-encrypted.json",
+    "build:coin-market-cap-proxy": "rm -f ./build/coin-market-cap-proxy/build.zip && mkdir -p ./build/coin-market-cap-proxy && zip -j ./build/coin-market-cap-proxy/build.zip ./src/coin-market-cap-proxy/index.js",
+    "build:triggers-oracle-node": "rm -f ./build/triggers-oracle-node/build.zip && mkdir -p ./build/triggers-oracle-node && zip -j ./build/triggers-oracle-node/build.zip ./src/triggers-oracle-node/index.js ./src/triggers-oracle-node/oracle-smart-contract-abi.json ./src/triggers-oracle-node/env-secrets-encrypted.json",
+    "build:deposit-oracle-node": "rm -f ./build/deposit-oracle-node/build.zip && mkdir -p ./build/deposit-oracle-node && zip -j ./build/deposit-oracle-node/build.zip ./src/deposit-oracle-node/index.js ./src/deposit-oracle-node/oracle-smart-contract-abi.json ./src/deposit-oracle-node/env-secrets-encrypted.json"
   },
   "author": "",
   "license": "ISC",
