@@ -3,19 +3,26 @@
   "version": "1.0.0",
   "description": "",
   "main": "x.js",
+  "type": "module",
   "scripts": {
+    "compile": "tsc",
+    "doc": "typedoc src/triggers-oracle-node/index.ts",
     "encrypt-secrets:triggers-oracle-node": "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/triggers-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/triggers-oracle-node/env-secrets-encrypted.json",
     "encrypt-secrets:deposit-oracle-node": "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/deposit-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/deposit-oracle-node/env-secrets-encrypted.json",
-    "build:coin-market-cap-proxy": "rm -f ./build/coin-market-cap-proxy/build.zip && mkdir -p ./build/coin-market-cap-proxy && zip -j ./build/coin-market-cap-proxy/build.zip ./src/coin-market-cap-proxy/index.js",
     "build:triggers-oracle-node": "rm -f ./build/triggers-oracle-node/build.zip && mkdir -p ./build/triggers-oracle-node && zip -j ./build/triggers-oracle-node/build.zip ./src/triggers-oracle-node/index.js ./src/triggers-oracle-node/oracle-smart-contract-abi.json ./src/triggers-oracle-node/env-secrets-encrypted.json",
     "build:deposit-oracle-node": "rm -f ./build/deposit-oracle-node/build.zip && mkdir -p ./build/deposit-oracle-node && zip -j ./build/deposit-oracle-node/build.zip ./src/deposit-oracle-node/index.js ./src/deposit-oracle-node/oracle-smart-contract-abi.json ./src/deposit-oracle-node/env-secrets-encrypted.json"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "aws-sdk": "^2.1269.0",
     "axios": "^1.1.3",
     "dotenv": "^16.0.3",
     "ethers": "^5.7.2",
     "web3": "^1.8.0"
+  },
+  "devDependencies": {
+    "typedoc": "^0.23.21",
+    "typescript": "^4.9.3"
   }
 }
