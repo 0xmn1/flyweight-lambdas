@@ -1,5 +1,7 @@
 import { Contract, ContractInterface, Signer, ethers, providers } from 'ethers';
 
+import fs from 'fs';
+
 export default class ContractFactory {
   constructor(
     private readonly _network: string,

@@ -1,11 +1,11 @@
 import CoinmarketcapPriceProxy from '../classes/CoinmarketcapPriceProxy';
-import { Config } from '../utils/configFactory';
+import { Config } from '../types/Config';
 import { Contract } from 'ethers';
 import ITriggersOracleNode from '../interfaces/ITriggersOracleNode';
-import OracleContractFactory from '../utils/oracleContractFactory';
-import { Order } from '../types/Order';
-import { OrderState } from '../types/OrderState';
-import { OrderTriggerDirection } from '../types/OrderTriggerDirection';
+import OracleContractFactory from '../../common/utils/ContractFactory';
+import { Order } from '../../common/types/Order';
+import { OrderState } from '../../common/types/OrderState';
+import { OrderTriggerDirection } from '../../common/types/OrderTriggerDirection';
 import { PriceMap } from '../types/PriceMap';
 import TriggerResult from './TriggerResult';
 import gasLimits from '../gas-limits.json';
@@ -98,7 +98,7 @@ export default class TriggersOracleNode implements ITriggersOracleNode {
 
     const orderIds = triggeredResults.map(r => r.orderId);
     const tx = await contract.functions.storePricesAndProcessTriggeredOrderIds(priceArray, orderIds, {
-      gasLimit: gasLimits.TRIGGER_ORDER
+      gasLimit: gasLimits.TRIGGER_ORDERS
     });
 
     console.log('Sending new data to oracle contract...');

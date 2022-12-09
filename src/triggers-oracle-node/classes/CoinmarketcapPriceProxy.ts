@@ -1,3 +1,5 @@
+import { TokenWhitelist, TokenWhitelists } from '../types/TokenWhitelists';
+
 import IPriceProxy from '../interfaces/IPriceProxy';
 import { PriceMap } from '../types/PriceMap';
 import axios from 'axios';
@@ -13,7 +15,8 @@ export default class CoinmarketcapPriceProxy implements IPriceProxy {
   }
 
   getPrices = async (): Promise<PriceMap> => {
-    const whitelist: { [key: string]: string } = tokenWhitelist[this._network];
+    const whitelists = tokenWhitelist as TokenWhitelists;
+    const whitelist: TokenWhitelist = whitelists[this._network];
     const symbols = Object.keys(whitelist);
     const res = await this.getCoinmarketcapResponse(symbols);
     const coinMarketCapData = res?.data;
