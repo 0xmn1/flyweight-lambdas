@@ -7,7 +7,8 @@ export default class ContractFactory {
     private readonly _network: string,
     private readonly _address: string,
     private readonly _alchemyPublicKey: string,
-    private readonly _signerPrivateKey: string
+    private readonly _signerPrivateKey: string,
+    private readonly _abiPath: string,
   ) {
   }
 
@@ -23,7 +24,7 @@ export default class ContractFactory {
   }
 
   private createContract(signerOrProvider: Signer | providers.Provider): Contract {
-    const abi: ContractInterface = JSON.parse(fs.readFileSync('oracle-smart-contract-abi.json', 'utf8'));
+    const abi: ContractInterface = JSON.parse(fs.readFileSync(this._abiPath, 'utf8'));
     return new ethers.Contract(this._address, abi, signerOrProvider);
   }
 }

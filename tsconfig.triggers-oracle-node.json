@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/common/**/*",
+    "src/triggers-oracle-node/**/*",
+    "src/triggers-oracle-node/**/*.json"
+  ],
+  "exclude": [
+    "src/**/env-secrets.json"
+  ]
+}

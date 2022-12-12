@@ -8,6 +8,7 @@ import { Order } from '../../common/types/Order';
 import { OrderState } from '../../common/types/OrderState';
 import axios from 'axios';
 import gasLimits from '../gas-limits.json';
+import path from 'path';
 
 /*
  * Oracle node to verify on-chain deposits to the oracle smart contract.
@@ -36,11 +37,13 @@ export default class DepositOracleNode {
    * This "1 pending order only" rule is enforced at the smart contract level & is done to minimise risk.
    */
   async runOracleNode(address: string) {
+    const oracleContractAbiPath = path.resolve(__dirname, '..', 'oracle-smart-contract-abi.json');
     const oracleContractFactory = new OracleContractFactory(
       this._config.network,
       this._config.oracleContractAddress,
       this._config.apiKeyAlchemy,
-      this._config.privateKey
+      this._config.privateKey,
+      oracleContractAbiPath,
     );
 
     // Try get pending order
@@ -53,23 +56,23 @@ export default class DepositOracleNode {
 
     const pendingOrder = await this.tryGetPendingOrder(contract, orders);
     if (!pendingOrder) {
-      console.log(`A pending order (w/o a deposit yet) was not found in the contract for address ${address}`);
+      console.log(`a pending order (w/o a deposit yet) was not found in the contract for address ${address}`);
       return;
     }
 
     // Try get the order's token deposit
     const depositTx = await this.tryGetDepositTx(contract, pendingOrder);
     if (!depositTx) {
-      console.log(`Deposit not found for order, id=${pendingOrder.id}, tokenIn=${pendingOrder.tokenIn}, tokenInAmount=${pendingOrder.tokenInAmount}, address searched for token txns via etherscan=${address}`);
+      console.log(`deposit not found for order, id=${pendingOrder.id}, tokenIn=${pendingOrder.tokenIn}, tokenInAmount=${pendingOrder.tokenInAmount}, address searched for token txns via etherscan=${address}`);
       return;
     }
 
     // Mark pending order as "deposited"
-    console.log(`Deposit detected (tx hash ${depositTx.hash}), updating contract state...`);
+    console.log(`deposit detected (tx hash ${depositTx.hash}), updating contract state...`);
     const oracleContractWrite = oracleContractFactory.createContractWrite();
     await this.storeDepositTx(oracleContractWrite, pendingOrder, depositTx);
 
-    const msg = `Oracle successfully ran. The deposit transaction was: ${JSON.stringify(depositTx)}`;
+    const msg = `oracle successfully ran. The deposit transaction was: ${JSON.stringify(depositTx)}`;
     console.log(msg);
     return {
       statusCode: 200,
@@ -80,7 +83,7 @@ export default class DepositOracleNode {
   private async tryGetPendingOrder(contract: Contract, orders: Order[]): Promise<Order | null> {
     for (let order of orders) {
       if (order.orderState === OrderState.PENDING_DEPOSIT) {
-        console.log(`Found pending order, id=${order.id}. Checking if deposit already recorded in contract...`);
+        console.log(`found pending order, id=${order.id}. Checking if deposit already recorded in contract...`);
 
         const depositTxRes = await contract.functions.depositTxns(order.id);
         const depositTx = depositTxRes[0];
@@ -97,7 +100,7 @@ export default class DepositOracleNode {
 
   // @returns null if matching tx is not found
   private async tryGetDepositTx(contract: Contract, pendingOrder: Order): Promise<EtherscanTokenTx | null> {
-    console.log('Searching for on-chain deposit tx...');
+    console.log('searching for on-chain deposit tx...');
     const provider = new EtherscanTransactionProvider(this._config.apiKeyEtherscan, this._config.etherscanApiBaseUrl);
     const tokenTxns = await provider.getTokenTransactions(pendingOrder.owner, pendingOrder.blockNumber);
     const depositTxs = tokenTxns.filter(tx =>
@@ -135,7 +138,7 @@ export default class DepositOracleNode {
       const whitelistedTokenAddressRes = await oracleContractReadOnly.functions.tryGetTokenAddress(tokenSymbolSanitized);
       const whitelistedTokenAddress = whitelistedTokenAddressRes[0];
 
-      console.log(`Match found. Verifying against the token contract address - token contract is ${tx.contractAddress}, oracle contract whitelisted address is ${whitelistedTokenAddress}`);
+      console.log(`match found. Verifying against the token contract address - token contract is ${tx.contractAddress}, oracle contract whitelisted address is ${whitelistedTokenAddress}`);
       return whitelistedTokenAddress && tx.contractAddress.toLowerCase() === whitelistedTokenAddress.toLowerCase();
     }
 

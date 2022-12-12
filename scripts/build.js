@@ -1,16 +1,54 @@
-import { series } from 'async';
-const { exec } = require('child_process');
-require('dotenv').config();
+import archiver from 'archiver';
+import async from 'async';
+import dotenv from 'dotenv';
+import { exec } from 'child_process';
+import fs from 'fs';
 
-const pipelineTasks = [
-  // Encypt secrets
-  "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/triggers-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/triggers-oracle-node/env-secrets-encrypted.json",
-  "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/deposit-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/deposit-oracle-node/env-secrets-encrypted.json",
-  // Create compile artifacts
-  "tsc --alwaysStrict",
-  // Create deployment artifacts
-  "rm -f ./build/triggers-oracle-node/build.zip && mkdir -p ./build/triggers-oracle-node && zip -j ./build/triggers-oracle-node/build.zip ./src/triggers-oracle-node/index.js ./src/triggers-oracle-node/oracle-smart-contract-abi.json ./src/triggers-oracle-node/env-secrets-encrypted.json",
-  "rm -f ./build/deposit-oracle-node/build.zip && mkdir -p ./build/deposit-oracle-node && zip -j ./build/deposit-oracle-node/build.zip ./src/deposit-oracle-node/index.js ./src/deposit-oracle-node/oracle-smart-contract-abi.json ./src/deposit-oracle-node/env-secrets-encrypted.json"
+var nodeArgs = process.argv.slice(2);
+const folderName = nodeArgs[0];
+if (!folderName) {
+  throw 'Missing node argument: folder name';
+}
+
+dotenv.config();
+
+const writeAwsLambdaShim = (callback, folderName) => {
+  const awsLambdaShim = `exports.handler = require("./${folderName}/index").handler;`;
+  fs.writeFile('./build/index.js', awsLambdaShim, callback);
+};
+
+const createAwsLambdaZip = (callback, folderName) => {
+  const output = fs.createWriteStream(`./build/${folderName}.zip`);
+  const archive = archiver('zip');
+  archive.on('error', err => { throw err; });
+  archive.pipe(output);
+  archive.glob(`common/**/*[.js|.json]`, { cwd: './build' });
+  archive.glob(`${folderName}/**/*[.js|.json]`, { cwd: './build' });
+  archive.glob('index.js', { cwd: './build' });
+  archive.finalize();
+  callback();
+};
+
+const execCommand = (callback, cmd) => exec(cmd, (err, res) => {
+  if (err !== undefined && err !== null) {
+    throw err;
+  } else {
+    callback();
+  }
+});
+
+const npxPipeline = [
+  callback => execCommand(callback, `npx tsc --alwaysStrict -p ./tsconfig.${folderName}.json`),
+  callback => execCommand(callback, "npx aws kms encrypt --key-id '" + process.env.AWS_KMS_KEY_ID + `' --plaintext fileb://./src/${folderName}/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./build/${folderName}/env-secrets-encrypted.json`),
+  callback => writeAwsLambdaShim(callback, folderName),
+  callback => createAwsLambdaZip(callback, folderName),
 ];
 
-series([pipelineTasks]); 
+fs.rmSync('./build', { recursive: true, force: true });
+async.series(npxPipeline, (err, result) => {
+  if (err) {
+    console.error(err);
+  } else {
+    console.log('build finished');
+  }
+});

@@ -6,32 +6,32 @@ import axios from 'axios';
 import tokenWhitelist from '../token-whitelist.json';
 
 export default class CoinmarketcapPriceProxy implements IPriceProxy {
-  private readonly _apiKey: string;
-  private readonly _network: string;
 
   // A proxy to get token prices via coinmarketcap api
-  constructor(apiKey: string, network: string) {
-    this._apiKey = apiKey;
-    this._network = network;
+  constructor(
+    private readonly _apiKey: string,
+    private readonly _apiBaseUrl: string,
+    private readonly _network: string,
+  ) {
   }
 
-  getPrices = async (): Promise<PriceMap> => {
+  tryGetPrices = async (): Promise<PriceMap> => {
     const whitelists = tokenWhitelist as TokenWhitelists;
     const whitelist: TokenWhitelist = whitelists[this._network];
     const symbols = Object.keys(whitelist);
     const res = await this.getCoinmarketcapResponse(symbols);
-    const coinMarketCapData = res?.data;
+    const coinMarketCapData = res?.data?.data;
     if (!coinMarketCapData) {
-      throw 'Failed to get coin market cap data';
+      throw 'failed to get coin market cap data';
     }
 
-    return symbols.reduce((map, symbol) => this.mapPrice(whitelist, coinMarketCapData, map, symbol), {});
+    return symbols.reduce((map, symbol) => this.tryMapPrice(whitelist, coinMarketCapData, map, symbol), {});
   };
 
   private async getCoinmarketcapResponse(symbols: string[]): Promise<any> {
     try {
       const symbolsUrlParam = symbols.join(',');
-      return axios.get(`https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?symbol=${symbolsUrlParam}`, {
+      return axios.get(`${this._apiBaseUrl}/v2/cryptocurrency/quotes/latest?symbol=${symbolsUrlParam}`, {
         headers: {
           'X-CMC_PRO_API_KEY': this._apiKey
         }
@@ -41,15 +41,29 @@ export default class CoinmarketcapPriceProxy implements IPriceProxy {
     }
   }
 
-  // @returns symbol=>price map
-  private mapPrice(whitelist: any, coinMarketCapData: any, priceMap: { [key: string]: number }, symbol: string) {
-    const listing = coinMarketCapData[symbol]?.find((listing: any) => {
-      const address = listing.platform.token_address;
+  /*
+   * Adds price to the map (if a price is available).
+   * When price not available, this method fails gracefully with a warning.
+   * @returns symbol=>price map
+   * @remarks CoinMarketCap API does not have testnet token contract addresses, so
+   * we only verify addresses if oracle is on mainnet.
+   */
+  private tryMapPrice(whitelist: any, coinMarketCapData: any, priceMap: { [key: string]: number }, symbol: string) {
+    const listings = [...coinMarketCapData[symbol]];
+    const listing = listings.find((listing: any) => {
       // Token contract address needs to be checked, since 1 symbol can represent multiple token contracts
-      return listing.platform.name.toLowerCase() === 'ethereum' && address.toLowerCase() === whitelist[symbol].toLowerCase();
+      const isCorrectChain = listing.platform.name.toLowerCase() === 'ethereum';
+      const tokenAddress = listing?.platform?.token_address;
+      const isCorrectAddress = tokenAddress && tokenAddress.toLowerCase() === whitelist[symbol].toLowerCase();
+      return isCorrectChain && isCorrectAddress;
     });
 
-    priceMap[symbol] = listing.quote.USD.price;
+    if (listing) {
+      priceMap[symbol] = listing.quote.USD.price;
+    } else {
+      console.warn(`no price data found, symbol=${symbol}`);
+    }
+
     return priceMap;
   };
 }

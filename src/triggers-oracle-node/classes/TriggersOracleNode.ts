@@ -9,6 +9,7 @@ import { OrderTriggerDirection } from '../../common/types/OrderTriggerDirection'
 import { PriceMap } from '../types/PriceMap';
 import TriggerResult from './TriggerResult';
 import gasLimits from '../gas-limits.json';
+import path from 'path';
 
 /*
  * Oracle node that periodically checks triggerable orders in the smart contract.
@@ -28,11 +29,13 @@ export default class TriggersOracleNode implements ITriggersOracleNode {
    * If none are triggered, no smart contract method is called (this allows us to save on gas).
    */
   async tryTriggerOrders() {
+    const oracleContractAbiPath = path.resolve(__dirname, '..', 'oracle-smart-contract-abi.json');
     const oracleContractFactory = new OracleContractFactory(
       this._config.network,
       this._config.oracleContractAddress,
       this._config.apiKeyAlchemy,
-      this._config.privateKey
+      this._config.privateKey,
+      oracleContractAbiPath,
     );
 
     const contract = oracleContractFactory.createContractReadOnly();
@@ -48,8 +51,13 @@ export default class TriggersOracleNode implements ITriggersOracleNode {
   }
 
   private async getPriceMap(): Promise<PriceMap> {
-    const priceProxy = new CoinmarketcapPriceProxy(this._config.apiKeyCoinMarketCap, this._config.network);
-    return await priceProxy.getPrices();
+    const priceProxy = new CoinmarketcapPriceProxy(
+      this._config.apiKeyCoinMarketCap,
+      this._config.apiBaseUrlCoinMarketCap,
+      this._config.network
+    );
+
+    return await priceProxy.tryGetPrices();
   }
 
   /*
@@ -71,7 +79,7 @@ export default class TriggersOracleNode implements ITriggersOracleNode {
 
       const price = priceMap[order.tokenIn];
       if (!price) {
-        console.log(`skipped: no price data available`);
+        console.log(`skipped: no price data available, tokenIn=${order.tokenIn}`);
         continue;
       }
 
@@ -116,7 +124,7 @@ export default class TriggersOracleNode implements ITriggersOracleNode {
       gasLimit: gasLimits.TRIGGER_ORDERS
     });
 
-    console.log('Sending new data to oracle contract...');
+    console.log('sending new data to oracle contract...');
     const txReceipt = await tx.wait();
     if (txReceipt.status !== 1) {
       throw txReceipt;
