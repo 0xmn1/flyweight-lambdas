@@ -107,3 +107,4 @@ build/
 env-secrets.json
 env-secrets-encrypted.json
 **/.DS_Store
+docs/
