@@ -1,0 +1,6 @@
+export enum OrderState {
+  UNTRIGGERED,
+  PENDING_DEPOSIT,
+  EXECUTED,
+  CANCELLED
+}

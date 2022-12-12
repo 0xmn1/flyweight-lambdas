@@ -1,0 +1,9 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/triggers-oracle-node/index.ts",
+    "src/deposit-oracle-node/index.ts"
+  ],
+  "includes": "src",
+  "out": "docs"
+}
