@@ -1,17 +1,40 @@
 import { Contract, ethers } from 'ethers';
+import { EtherscanApiResponse, EtherscanTokenTx } from '../types/EtherscanApiResponse';
 
 import { Config } from '../types/Config';
-import { EtherscanErc20Tx } from '../types/EtherscanErc20Tx';
+import EtherscanTransactionProvider from './EtherscanTransactionProvider';
 import OracleContractFactory from '../../common/utils/ContractFactory';
 import { Order } from '../../common/types/Order';
+import { OrderState } from '../../common/types/OrderState';
 import axios from 'axios';
+import gasLimits from '../gas-limits.json';
 
+/*
+ * Oracle node to verify on-chain deposits to the oracle smart contract.
+ * Supports both event-based (e.g.: webhook) & periodic triggers (e.g.: cron), & both
+ * should always be enabled.
+ * @remarks
+ * Periodic triggers are supported (in addition to event-based triggers) because Etherscan
+ * API indexes blocks w/ 1 confirmation, & thereby introducing a lag between on-chain confirmations
+ * & transactions being returned by their API (0xmn1 has confirmed this undocumented quirky behaviour with
+ * the Etherscan support team).
+ */
 export default class DepositOracleNode {
+  private static readonly DEFAULT_ADDRESS = '0x0000000000000000000000000000000000000000000000000000000000000000';
+
   constructor(
     private readonly _config: Config
   ) {
   }
 
+  /*
+   * Entry point for the oracle node.
+   * Gets orders in "pending" {@link OrderState} and searches for a matching on-chain token transaction.
+   * @param address - must be an Externally Owned Account (EOA), & is enforced at the smart contract level.
+   * @remarks
+   * Links 1 pending order at a time.
+   * This "1 pending order only" rule is enforced at the smart contract level & is done to minimise risk.
+   */
   async runOracleNode(address: string) {
     const oracleContractFactory = new OracleContractFactory(
       this._config.network,
@@ -20,26 +43,28 @@ export default class DepositOracleNode {
       this._config.privateKey
     );
 
+    // Try get pending order
     const contract = oracleContractFactory.createContractReadOnly();
     const pendingOrdersAllUsersRes = await contract.functions.getPendingDepositOrders();
-    const pendingOrdersAllUsers: Array<Order> = pendingOrdersAllUsersRes[0];
-    const orders = pendingOrdersAllUsers.filter(o => o.owner.toLowerCase() === address.toLowerCase());
+    const pendingOrdersAllUsers: Order[] = pendingOrdersAllUsersRes[0];
+    const orders = [...pendingOrdersAllUsers]
+      .filter(o => o.owner.toLowerCase() === address.toLowerCase())
+      .sort((o1, o2) => o1.id - o2.id);
 
-    // Get earliest pending order for address (ordered by block #)
     const pendingOrder = await this.tryGetPendingOrder(contract, orders);
     if (!pendingOrder) {
       console.log(`A pending order (w/o a deposit yet) was not found in the contract for address ${address}`);
       return;
     }
 
-    // Get deposits for user (ordered by block #)]
+    // Try get the order's token deposit
     const depositTx = await this.tryGetDepositTx(contract, pendingOrder);
     if (!depositTx) {
-      console.log(`Deposit not found for order, id=${pendingOrder.id}, tokenIn=${pendingOrder.tokenIn}, tokenInAmount=${pendingOrder.tokenInAmount}, address searched for erc20 txns via etherscan=${address}`);
+      console.log(`Deposit not found for order, id=${pendingOrder.id}, tokenIn=${pendingOrder.tokenIn}, tokenInAmount=${pendingOrder.tokenInAmount}, address searched for token txns via etherscan=${address}`);
       return;
     }
 
-    // If hasDeposited == true, update contract state (orderId, orderState, deposited block #)
+    // Mark pending order as "deposited"
     console.log(`Deposit detected (tx hash ${depositTx.hash}), updating contract state...`);
     const oracleContractWrite = oracleContractFactory.createContractWrite();
     await this.storeDepositTx(oracleContractWrite, pendingOrder, depositTx);
@@ -52,16 +77,14 @@ export default class DepositOracleNode {
     };
   }
 
-  private async tryGetPendingOrder(contract: Contract, orders: Array<Order>): Promise<Order | null> {
-    const ORDER_STATE_PENDING_DEPOSIT = 1;
-    const DEFAULT_ADDRESS = '0x0000000000000000000000000000000000000000000000000000000000000000';
+  private async tryGetPendingOrder(contract: Contract, orders: Order[]): Promise<Order | null> {
     for (let order of orders) {
-      if (order.orderState === ORDER_STATE_PENDING_DEPOSIT) {
-        console.log(`Found order with pending orderState, id=${order.id}. Checking if deposit already recorded in contract...`);
+      if (order.orderState === OrderState.PENDING_DEPOSIT) {
+        console.log(`Found pending order, id=${order.id}. Checking if deposit already recorded in contract...`);
 
         const depositTxRes = await contract.functions.depositTxns(order.id);
         const depositTx = depositTxRes[0];
-        const isOrderNotDepositedYet = depositTx === DEFAULT_ADDRESS;
+        const isOrderNotDepositedYet = depositTx === DepositOracleNode.DEFAULT_ADDRESS;
         if (isOrderNotDepositedYet) {
           console.log('deposit not recorded yet.');
           return order;
@@ -72,25 +95,16 @@ export default class DepositOracleNode {
     return null;
   }
 
-  private async tryGetDepositTx(contract: Contract, pendingOrder: Order): Promise<EtherscanErc20Tx | null> {
-    console.log('Searching for deposit...');
-    const ETHERSCAN_API_STATUS_CODE_OK = '1';
-    const apiUrl = `https://api-goerli.etherscan.io/api?module=account&action=tokentx&address=${pendingOrder.owner}&page=1&offset=1000&startblock=${pendingOrder.blockNumber}&sort=desc&apikey=${this._config.apiKeyEtherscan}`;
-    const res = await axios.get(apiUrl);
-    if (res.status !== 200 || res.data.status !== ETHERSCAN_API_STATUS_CODE_OK) {
-      console.error('Etherscan api call failed:');
-      console.error(res);
-      throw `Etherscan api call failed, status, http status: ${res.status}`;
-    }
-
-    const erc20Txns: Array<EtherscanErc20Tx> = res.data.result;
-    const depositTxs = erc20Txns.filter(tx =>
+  // @returns null if matching tx is not found
+  private async tryGetDepositTx(contract: Contract, pendingOrder: Order): Promise<EtherscanTokenTx | null> {
+    console.log('Searching for on-chain deposit tx...');
+    const provider = new EtherscanTransactionProvider(this._config.apiKeyEtherscan, this._config.etherscanApiBaseUrl);
+    const tokenTxns = await provider.getTokenTransactions(pendingOrder.owner, pendingOrder.blockNumber);
+    const depositTxs = tokenTxns.filter(tx =>
       tx.to.toLowerCase() === this._config.oracleContractAddress.toLowerCase()  // Case insensitive, to handle addresses using checksums
       && parseInt(tx.confirmations) > 0
     );
 
-    // hasDeposited = filter deposits by order.tokenInAmount == tx.amount
-    let depositTx = null;
     for (let tx of depositTxs) {
       if (await this.isDepositMatchOrder(contract, pendingOrder, tx)) {
         return tx;
@@ -100,7 +114,13 @@ export default class DepositOracleNode {
     return null;
   }
 
-  private async isDepositMatchOrder(oracleContractReadOnly: Contract, order: Order, tx: EtherscanErc20Tx) {
+  /*
+   * Checks if a on-chain token transaction was for a specific Flyweight order.
+   * @remarks
+   * The criteria used to "match" smart contract orders to token transactions, must remain overly strict to maximise product safety.
+   * The logic used in this oracle method has a strong responsibility in minimising financial risk for the flyweight platform, hence the verbosity.
+   */
+  private async isDepositMatchOrder(oracleContractReadOnly: Contract, order: Order, tx: EtherscanTokenTx) {
     const expectedTxValue = BigInt(order.tokenInAmount).toString(10);  // Etherscan returns token amounts in decimal format, as a string 
     const isMatch = tx.from.toLowerCase() === order.owner.toLowerCase()
       && tx.to.toLowerCase() === oracleContractReadOnly.address.toLowerCase()
@@ -110,24 +130,24 @@ export default class DepositOracleNode {
 
     if (isMatch) {
       // Verify that the tx contract address.
-      // This is a necessary defensive measure - multiple erc20 tokens can have the same symbol but different addresses.
+      // This is a necessary measure (multiple tokens can have the same symbol but different addresses).
       const tokenSymbolSanitized = tx.tokenSymbol.trim().toUpperCase();
       const whitelistedTokenAddressRes = await oracleContractReadOnly.functions.tryGetTokenAddress(tokenSymbolSanitized);
       const whitelistedTokenAddress = whitelistedTokenAddressRes[0];
 
-      console.log(`Match found. Verifying against the token contract address - erc20 contract is ${tx.contractAddress}, oracle contract whitelisted address is ${whitelistedTokenAddress}`);
+      console.log(`Match found. Verifying against the token contract address - token contract is ${tx.contractAddress}, oracle contract whitelisted address is ${whitelistedTokenAddress}`);
       return whitelistedTokenAddress && tx.contractAddress.toLowerCase() === whitelistedTokenAddress.toLowerCase();
     }
 
     return false;
   }
 
-  private async storeDepositTx(contract: Contract, pendingOrder: Order, depositTx: EtherscanErc20Tx): Promise<void> {
+  private async storeDepositTx(contract: Contract, pendingOrder: Order, depositTx: EtherscanTokenTx): Promise<void> {
     const storeDepositTx = await contract.functions.storeDepositTransactionsAndUpdateOrderStates([{
       orderId: pendingOrder.id,
       txHash: depositTx.hash
     }], {
-      gasLimit: 5000000
+      gasLimit: gasLimits.STORE_DEPOSIT_TX,
     });
 
     const storeDepositTxReceipt = await storeDepositTx.wait();

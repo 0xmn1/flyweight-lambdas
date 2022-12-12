@@ -1,8 +1,9 @@
+import { AwsLambdaEvent } from '../common/types/AwsLambdaEvent';
 import { Config } from './types/Config';
 import ConfigFactory from '../common/utils/ConfigFactory';
 import TriggersOracleNode from './classes/TriggersOracleNode';
 
-exports.handler = async (event: unknown) => {
+exports.handler = async (event: AwsLambdaEvent) => {
   console.log('run started');
 
   try {

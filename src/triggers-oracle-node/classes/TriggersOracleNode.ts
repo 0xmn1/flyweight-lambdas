@@ -1,4 +1,4 @@
-import CoinmarketcapPriceProxy from '../classes/CoinmarketcapPriceProxy';
+import CoinmarketcapPriceProxy from './CoinmarketcapPriceProxy';
 import { Config } from '../types/Config';
 import { Contract } from 'ethers';
 import ITriggersOracleNode from '../interfaces/ITriggersOracleNode';
@@ -10,6 +10,10 @@ import { PriceMap } from '../types/PriceMap';
 import TriggerResult from './TriggerResult';
 import gasLimits from '../gas-limits.json';
 
+/*
+ * Oracle node that periodically checks triggerable orders in the smart contract.
+ * An order is triggered when its' price condition is met.
+ */
 export default class TriggersOracleNode implements ITriggersOracleNode {
   private readonly _config: Config;
 
@@ -17,6 +21,12 @@ export default class TriggersOracleNode implements ITriggersOracleNode {
     this._config = config;
   }
 
+  /*
+   * This method is the entry point for the oracle node.
+   * Checks all triggerable orders in the smart contract.
+   * If any are triggered, a smart contract method is called (which executes the swap).
+   * If none are triggered, no smart contract method is called (this allows us to save on gas).
+   */
   async tryTriggerOrders() {
     const oracleContractFactory = new OracleContractFactory(
       this._config.network,
@@ -39,13 +49,17 @@ export default class TriggersOracleNode implements ITriggersOracleNode {
 
   private async getPriceMap(): Promise<PriceMap> {
     const priceProxy = new CoinmarketcapPriceProxy(this._config.apiKeyCoinMarketCap, this._config.network);
-    let prices: PriceMap | null = null;
     return await priceProxy.getPrices();
   }
 
-  private async getTriggerResults(contract: Contract, priceMap: PriceMap): Promise<Array<TriggerResult>> {
+  /*
+   * @returns Array of calculated trigger results
+   * @remarks
+   * Only orders in "untriggered" {@link OrderState} are checked
+   */
+  private async getTriggerResults(contract: Contract, priceMap: PriceMap): Promise<TriggerResult[]> {
     const ordersCount = await contract.functions.ordersCount();
-    const triggerResults: Array<TriggerResult> = [];
+    const triggerResults: TriggerResult[] = [];
 
     for (let i = 0; i < ordersCount; i++) {
       const order: Order = await contract.functions.orders(i);
@@ -86,10 +100,11 @@ export default class TriggersOracleNode implements ITriggersOracleNode {
     return false;
   }
 
+  // Sends price and triggered order id's to smart contract
   private async storePricesAndProcessTriggeredOrderIds(
     contract: Contract,
     priceMap: PriceMap,
-    triggeredResults: Array<TriggerResult>
+    triggeredResults: TriggerResult[],
   ): Promise<void> {
     const priceArray = Object.keys(priceMap).map(symbol => ({
       symbol,

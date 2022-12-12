@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "compile": "tsc --alwaysStrict",
-    "doc": "typedoc src/triggers-oracle-node/index.ts",
+    "doc": "typedoc ./src/triggers-oracle-node/index.ts ./src/deposit-oracle-node/index.ts",
     "encrypt-secrets:triggers-oracle-node": "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/triggers-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/triggers-oracle-node/env-secrets-encrypted.json",
     "encrypt-secrets:deposit-oracle-node": "aws kms encrypt --key-id 'PUT_YOUR_AWS_KEY_ID_HERE' --plaintext fileb://./src/deposit-oracle-node/env-secrets.json --output text --query CiphertextBlob --output text | base64 -D > ./src/deposit-oracle-node/env-secrets-encrypted.json",
     "build:triggers-oracle-node": "rm -f ./build/triggers-oracle-node/build.zip && mkdir -p ./build/triggers-oracle-node && zip -j ./build/triggers-oracle-node/build.zip ./src/triggers-oracle-node/index.js ./src/triggers-oracle-node/oracle-smart-contract-abi.json ./src/triggers-oracle-node/env-secrets-encrypted.json",

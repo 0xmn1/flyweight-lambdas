@@ -9,6 +9,7 @@ export default class CoinmarketcapPriceProxy implements IPriceProxy {
   private readonly _apiKey: string;
   private readonly _network: string;
 
+  // A proxy to get token prices via coinmarketcap api
   constructor(apiKey: string, network: string) {
     this._apiKey = apiKey;
     this._network = network;
@@ -27,7 +28,7 @@ export default class CoinmarketcapPriceProxy implements IPriceProxy {
     return symbols.reduce((map, symbol) => this.mapPrice(whitelist, coinMarketCapData, map, symbol), {});
   };
 
-  private async getCoinmarketcapResponse(symbols: Array<string>): Promise<any> {
+  private async getCoinmarketcapResponse(symbols: string[]): Promise<any> {
     try {
       const symbolsUrlParam = symbols.join(',');
       return axios.get(`https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?symbol=${symbolsUrlParam}`, {
@@ -40,9 +41,11 @@ export default class CoinmarketcapPriceProxy implements IPriceProxy {
     }
   }
 
+  // @returns symbol=>price map
   private mapPrice(whitelist: any, coinMarketCapData: any, priceMap: { [key: string]: number }, symbol: string) {
     const listing = coinMarketCapData[symbol]?.find((listing: any) => {
       const address = listing.platform.token_address;
+      // Token contract address needs to be checked, since 1 symbol can represent multiple token contracts
       return listing.platform.name.toLowerCase() === 'ethereum' && address.toLowerCase() === whitelist[symbol].toLowerCase();
     });
 
