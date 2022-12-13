@@ -2,6 +2,7 @@ import { Contract, ethers } from 'ethers';
 import { EtherscanApiResponse, EtherscanTokenTx } from '../types/EtherscanApiResponse';
 
 import { Config } from '../types/Config';
+import DepositTx from './DepositTx';
 import EtherscanTransactionProvider from './EtherscanTransactionProvider';
 import OracleContractFactory from '../../common/utils/ContractFactory';
 import { Order } from '../../common/types/Order';
@@ -36,7 +37,7 @@ export default class DepositOracleNode {
    * Links 1 pending order at a time.
    * This "1 pending order only" rule is enforced at the smart contract level & is done to minimise risk.
    */
-  async runOracleNode(address: string) {
+  async runOracleNode(targetAddress: string | undefined | null) {
     const oracleContractAbiPath = path.resolve(__dirname, '..', 'oracle-smart-contract-abi.json');
     const oracleContractFactory = new OracleContractFactory(
       this._config.network,
@@ -46,38 +47,71 @@ export default class DepositOracleNode {
       oracleContractAbiPath,
     );
 
-    // Try get pending order
     const contract = oracleContractFactory.createContractReadOnly();
     const pendingOrdersAllUsersRes = await contract.functions.getPendingDepositOrders();
     const pendingOrdersAllUsers: Order[] = pendingOrdersAllUsersRes[0];
-    const orders = [...pendingOrdersAllUsers]
-      .filter(o => o.owner.toLowerCase() === address.toLowerCase())
-      .sort((o1, o2) => o1.id - o2.id);
 
-    const pendingOrder = await this.tryGetPendingOrder(contract, orders);
-    if (!pendingOrder) {
-      console.log(`a pending order (w/o a deposit yet) was not found in the contract for address ${address}`);
-      return;
+    let addressesToCheck = targetAddress
+      ? [targetAddress]
+      : pendingOrdersAllUsers
+        .filter(o => o.owner !== '0x0000000000000000000000000000000000000000')
+        .map(o => o.owner);
+
+    // Try mark pending orders as "deposited"
+    const verifiedDepositTxns: DepositTx[] = [];
+    for (let address of addressesToCheck) {
+      const addressOrders = [...pendingOrdersAllUsers]
+        .filter(o => o.owner.toLowerCase() === address.toLowerCase())
+        .sort((o1, o2) => o1.id - o2.id);
+
+      const depositTx = await this.tryGetDepositTxForAddress(contract, address, addressOrders);
+      if (depositTx) {
+        // Mark pending order as "deposited"
+        verifiedDepositTxns.push(depositTx);
+      }
     }
 
-    // Try get the order's token deposit
-    const depositTx = await this.tryGetDepositTx(contract, pendingOrder);
-    if (!depositTx) {
-      console.log(`deposit not found for order, id=${pendingOrder.id}, tokenIn=${pendingOrder.tokenIn}, tokenInAmount=${pendingOrder.tokenInAmount}, address searched for token txns via etherscan=${address}`);
-      return;
+    if (verifiedDepositTxns.length) {
+      console.log('verified deposit txns:');
+      console.log(verifiedDepositTxns);
+      console.log(`sending new verified deposit txns to contract...`);
+      const oracleContractWrite = oracleContractFactory.createContractWrite();
+      await this.storeDepositTx(oracleContractWrite, verifiedDepositTxns);
+      console.log('sent');
     }
 
-    // Mark pending order as "deposited"
-    console.log(`deposit detected (tx hash ${depositTx.hash}), updating contract state...`);
-    const oracleContractWrite = oracleContractFactory.createContractWrite();
-    await this.storeDepositTx(oracleContractWrite, pendingOrder, depositTx);
-
-    const msg = `oracle successfully ran. The deposit transaction was: ${JSON.stringify(depositTx)}`;
+    const msg = 'oracle successfully ran';
     console.log(msg);
     return {
       statusCode: 200,
       body: msg
     };
+  }
+
+  // Given an address, tries to find the deposit tx for their pending order
+  private async tryGetDepositTxForAddress(
+    contract: Contract,
+    address: string,
+    addressOrders: Order[],
+  ): Promise<DepositTx | null> {
+    console.log(`checking deposit for address, address=${address}`);
+
+    // Try get pending order
+    const pendingOrder = await this.tryGetPendingOrder(contract, addressOrders);
+    if (!pendingOrder) {
+      console.log('a pending order (w/o a deposit yet) was not found in the contract for this address');
+      return null;
+    }
+
+    // Try get the order's token deposit
+    const depositTx = await this.tryGetDepositTx(contract, pendingOrder);
+    if (!depositTx) {
+      console.log(`deposit tx not found, orderId=${pendingOrder.id}, tokenIn=${pendingOrder.tokenIn}, tokenInAmount=${pendingOrder.tokenInAmount}`);
+      return null;
+    }
+
+    console.log('deposit tx found');
+    return new DepositTx(pendingOrder.id, depositTx.hash);
   }
 
   private async tryGetPendingOrder(contract: Contract, orders: Order[]): Promise<Order | null> {
@@ -145,11 +179,8 @@ export default class DepositOracleNode {
     return false;
   }
 
-  private async storeDepositTx(contract: Contract, pendingOrder: Order, depositTx: EtherscanTokenTx): Promise<void> {
-    const storeDepositTx = await contract.functions.storeDepositTransactionsAndUpdateOrderStates([{
-      orderId: pendingOrder.id,
-      txHash: depositTx.hash
-    }], {
+  private async storeDepositTx(contract: Contract, verifiedDepositTxns: DepositTx[]): Promise<void> {
+    const storeDepositTx = await contract.functions.storeDepositTransactionsAndUpdateOrderStates(verifiedDepositTxns, {
       gasLimit: gasLimits.STORE_DEPOSIT_TX,
     });
 
