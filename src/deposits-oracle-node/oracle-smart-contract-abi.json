@@ -1,153 +1,29 @@
 [
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_uniswapRouterAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_oracleNodeAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "string[]",
+        "name": "tokenSymbols",
+        "type": "string[]"
+      },
+      {
+        "internalType": "address[]",
+        "name": "tokenAddresses",
+        "type": "address[]"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "constructor"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "orderId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      }
-    ],
-    "name": "OrderCancelRequested",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "orderId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "tokenInAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "tokenIn",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "blockNumber",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "blockTimestamp",
-        "type": "uint256"
-      }
-    ],
-    "name": "OrderCancelled",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "orderId",
-        "type": "uint256"
-      }
-    ],
-    "name": "OrderExecuted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "orderId",
-        "type": "uint256"
-      }
-    ],
-    "name": "OrderTriggered",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "symbol",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "oldPrice",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "newPrice",
-        "type": "string"
-      }
-    ],
-    "name": "PriceUpdated",
-    "type": "event"
-  },
-  {
-    "inputs": [],
-    "name": "ORACLE_NODE_ADDRESS",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "UNISWAP_ROUTER_ADDRESS",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
   },
   {
     "inputs": [
@@ -167,7 +43,7 @@
         "type": "string"
       },
       {
-        "internalType": "enum Flyweight.OrderTriggerDirection",
+        "internalType": "enum OrderTriggerDirection",
         "name": "direction",
         "type": "uint8"
       },
@@ -243,7 +119,7 @@
             "type": "address"
           },
           {
-            "internalType": "enum Flyweight.OrderState",
+            "internalType": "enum OrderState",
             "name": "orderState",
             "type": "uint8"
           },
@@ -263,7 +139,7 @@
             "type": "string"
           },
           {
-            "internalType": "enum Flyweight.OrderTriggerDirection",
+            "internalType": "enum OrderTriggerDirection",
             "name": "direction",
             "type": "uint8"
           },
@@ -278,7 +154,7 @@
             "type": "uint256"
           }
         ],
-        "internalType": "struct Flyweight.Order[]",
+        "internalType": "struct Order[]",
         "name": "",
         "type": "tuple[]"
       }
@@ -303,7 +179,7 @@
             "type": "address"
           },
           {
-            "internalType": "enum Flyweight.OrderState",
+            "internalType": "enum OrderState",
             "name": "orderState",
             "type": "uint8"
           },
@@ -323,7 +199,7 @@
             "type": "string"
           },
           {
-            "internalType": "enum Flyweight.OrderTriggerDirection",
+            "internalType": "enum OrderTriggerDirection",
             "name": "direction",
             "type": "uint8"
           },
@@ -338,7 +214,7 @@
             "type": "uint256"
           }
         ],
-        "internalType": "struct Flyweight.Order[]",
+        "internalType": "struct Order[]",
         "name": "",
         "type": "tuple[]"
       }
@@ -347,19 +223,26 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "string[]",
-        "name": "symbols",
-        "type": "string[]"
-      }
-    ],
+    "inputs": [],
     "name": "getWhitelistedSymbols",
     "outputs": [
       {
         "internalType": "string[]",
         "name": "",
         "type": "string[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "oracleNodeAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -410,7 +293,7 @@
         "type": "address"
       },
       {
-        "internalType": "enum Flyweight.OrderState",
+        "internalType": "enum OrderState",
         "name": "orderState",
         "type": "uint8"
       },
@@ -430,7 +313,7 @@
         "type": "string"
       },
       {
-        "internalType": "enum Flyweight.OrderTriggerDirection",
+        "internalType": "enum OrderTriggerDirection",
         "name": "direction",
         "type": "uint8"
       },
@@ -495,7 +378,7 @@
             "type": "bytes32"
           }
         ],
-        "internalType": "struct Flyweight.NewDepositTx[]",
+        "internalType": "struct NewDepositTx[]",
         "name": "txns",
         "type": "tuple[]"
       }
@@ -520,7 +403,7 @@
             "type": "string"
           }
         ],
-        "internalType": "struct Flyweight.NewPriceItem[]",
+        "internalType": "struct NewPriceItem[]",
         "name": "newPriceItems",
         "type": "tuple[]"
       },
@@ -557,6 +440,19 @@
       }
     ],
     "name": "tryGetTokenAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "uniswapRouterAddress",
     "outputs": [
       {
         "internalType": "address",
